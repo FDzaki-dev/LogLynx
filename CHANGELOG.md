@@ -1,5 +1,12 @@
 # Changelog
 
+## v5 — 2026-10-01
+- Tampilan baru terinspirasi LogcatReader: app bar teal berisi judul + jumlah baris, tombol Cari, Jeda/Lanjut auto-scroll, dan menu (tampilan ringkas, hapus log). Mengikuti tema terang/gelap sistem.
+- Baris log: badge prioritas berwarna di kiri, tag, pesan, lalu tanggal/jam/PID/TID. Mode ringkas satu baris (tap = buka detail). Tint merah/oranye untuk E/F/W tetap ada.
+- Pencarian: search bar menggantikan app bar, kecocokan disorot kuning, tombol Regex (teks merah jika regex tidak valid). Level minimum jadi baris chip yang bisa digulir.
+- Tekan lama baris = menu bawah: salin baris, salin pesan, filter tag ini. Scrollbar tipis dan tombol gulir atas/bawah.
+- Dihapus: toolbar 3 baris lama (digantikan app bar + chip level).
+
 ## v4 — 2026-10-01
 - Hemat baterai: sinkronisasi log ke layar berhenti total saat aplikasi di background (tanpa wake-up 200 ms dan salinan buffer 50.000 baris); otomatis lanjut saat aplikasi dibuka lagi.
 - UI: toolbar kini bisa digulir dan tingginya dibatasi maksimal setengah area tersedia, sehingga tidak terpotong di landscape/keyboard terbuka dan daftar log tetap terlihat.

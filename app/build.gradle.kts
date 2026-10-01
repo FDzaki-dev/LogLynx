@@ -80,6 +80,8 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.foundation:foundation")
+    // Ikon dasar (Search, MoreVert, dll.) untuk UI v3; set extended sengaja tidak dipakai (APK kecil)
+    implementation("androidx.compose.material:material-icons-core")
 
     // Activity (setContent + enableEdgeToEdge)
     implementation("androidx.activity:activity-compose:1.9.3")

@@ -1,74 +1,101 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.pro.logcatreader
 
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.layout
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pro.logcatreader.model.LogLevel
 import com.pro.logcatreader.model.LogLine
+import com.pro.logcatreader.ui.LogListEntry
+import com.pro.logcatreader.ui.logScrollbar
+import com.pro.logcatreader.ui.theme.LogLynxTheme
+import com.pro.logcatreader.ui.theme.badgeColor
 import com.pro.logcatreader.viewmodel.LogcatViewModel
-
-private val BgColor = Color(0xFF1E1E1E)
-private val ToolbarColor = Color(0xFF2B2B2B)
-private val ChipColor = Color(0xFF3A3A3A)
-private val MessageColor = Color(0xFFE2E2E2)
-private val DimColor = Color(0xFF8A8A8A)
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     // Instance sama dengan viewModel() di LogcatScreen (owner = Activity)
@@ -86,19 +113,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // App bar selalu teal gelap -> ikon status bar terang di kedua tema; nav bar mengikuti tema sistem
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+            navigationBarStyle = SystemBarStyle.auto(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            )
         )
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = BgColor,
-                    contentColor = MessageColor
-                ) {
-                    LogcatScreen()
-                }
+            LogLynxTheme {
+                LogcatScreen()
             }
         }
     }
@@ -112,7 +137,25 @@ fun LogcatScreen(viewModel: LogcatViewModel = viewModel()) {
     val isRegex by viewModel.isRegexEnabled.collectAsStateWithLifecycle()
 
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     var autoScrollLocked by rememberSaveable { mutableStateOf(true) }
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+    var compactView by rememberSaveable { mutableStateOf(false) }
+    var selectedId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    // Regex sorotan dikompilasi sekali per perubahan query (bukan per baris)
+    val highlight: Regex? = remember(searchQuery, isRegex) {
+        if (searchQuery.isEmpty()) {
+            null
+        } else {
+            runCatching {
+                Regex(if (isRegex) searchQuery else Regex.escape(searchQuery), RegexOption.IGNORE_CASE)
+            }.getOrNull()
+        }
+    }
+    val regexError = isRegex && searchQuery.isNotEmpty() && highlight == null
+    val filtered = searchQuery.isNotEmpty() || minLevel != LogLevel.VERBOSE
+    val selected: LogLine? = selectedId?.let { id -> logs.lastOrNull { it.id == id } }
 
     // Auto-Scroll Interruption Lock: user menyentuh/menggeser list -> auto-scroll berhenti
     LaunchedEffect(listState) {
@@ -128,249 +171,385 @@ fun LogcatScreen(viewModel: LogcatViewModel = viewModel()) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-            .imePadding()
-    ) {
-        // ===== TOOLBAR (tiap baris muat di layar sempit: bobot rata, tanpa tinggi fixed) =====
-        // Tinggi dibatasi maks 50% area tersedia + scrollable: tidak terpotong di landscape/keyboard terbuka
+    fun closeSearch() {
+        searchActive = false
+        viewModel.searchQuery.value = ""
+    }
+
+    BackHandler(enabled = searchActive) { closeSearch() }
+
+    // safeDrawing = systemBars + ime + cutout: konten tidak terpotong status/nav bar maupun keyboard
+    Scaffold(
+        topBar = {
+            if (searchActive) {
+                SearchTopBar(
+                    query = searchQuery,
+                    isRegex = isRegex,
+                    regexError = regexError,
+                    onQueryChange = { viewModel.searchQuery.value = it },
+                    onToggleRegex = { viewModel.isRegexEnabled.value = !isRegex },
+                    onClose = { closeSearch() }
+                )
+            } else {
+                LogTopBar(
+                    count = logs.size,
+                    filtered = filtered,
+                    scrollPaused = !autoScrollLocked,
+                    compactView = compactView,
+                    onSearch = { searchActive = true },
+                    onTogglePause = { autoScrollLocked = !autoScrollLocked },
+                    onToggleCompact = { compactView = !compactView },
+                    onClear = { viewModel.clearAllLogs() }
+                )
+            }
+        },
+        contentWindowInsets = WindowInsets.safeDrawing
+    ) { innerPadding ->
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .layout { measurable, constraints ->
-                    val limited = if (constraints.hasBoundedHeight) {
-                        constraints.copy(maxHeight = maxOf(constraints.minHeight, constraints.maxHeight / 2))
-                    } else {
-                        constraints
-                    }
-                    val placeable = measurable.measure(limited)
-                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-                }
-                .background(ToolbarColor)
-                .verticalScroll(rememberScrollState())
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .fillMaxSize()
+                .padding(innerPadding)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                BasicTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.searchQuery.value = it },
-                    singleLine = true,
-                    textStyle = TextStyle(color = MessageColor, fontSize = 14.sp),
-                    cursorBrush = SolidColor(Color.Cyan),
-                    modifier = Modifier.weight(1f),
-                    decorationBox = { innerTextField ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(ChipColor)
-                                .padding(horizontal = 12.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                if (searchQuery.isEmpty()) {
-                                    Text("Cari tag / pesan...", color = DimColor, fontSize = 14.sp, maxLines = 1)
-                                }
-                                innerTextField()
-                            }
-                            if (searchQuery.isNotEmpty()) {
-                                Text(
-                                    text = "✕",
-                                    color = DimColor,
-                                    fontSize = 14.sp,
-                                    modifier = Modifier
-                                        .clickable { viewModel.searchQuery.value = "" }
-                                        .padding(start = 8.dp)
-                                )
-                            }
-                        }
-                    }
-                )
-                ToolbarChip(
-                    label = "Regex",
-                    onClick = { viewModel.isRegexEnabled.value = !isRegex },
-                    containerColor = if (isRegex) Color.Cyan else ChipColor,
-                    contentColor = if (isRegex) Color.Black else MessageColor,
-                    bold = isRegex
-                )
-            }
+            LevelFilterRow(
+                minLevel = minLevel,
+                onSelect = { viewModel.selectedMinLevel.value = it }
+            )
+            HorizontalDivider()
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text("Min", color = DimColor, fontSize = 12.sp, modifier = Modifier.padding(end = 2.dp))
-                LogLevel.entries.forEach { level ->
-                    val selected = minLevel == level
-                    ToolbarChip(
-                        label = level.char,
-                        onClick = { viewModel.selectedMinLevel.value = level },
-                        modifier = Modifier.weight(1f),
-                        containerColor = if (selected) level.color else ChipColor,
-                        contentColor = if (selected) Color.Black else level.color,
-                        bold = true
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                if (logs.isEmpty()) {
+                    Text(
+                        text = if (filtered) "Tidak ada log yang cocok dengan filter" else "Menunggu log…",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 }
-            }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                ToolbarChip(
-                    label = if (autoScrollLocked) "🔒 Auto-scroll" else "⏸ Dibekukan",
-                    onClick = { autoScrollLocked = !autoScrollLocked },
-                    contentColor = if (autoScrollLocked) Color(0xFF66BB6A) else Color(0xFFFFEB3B)
-                )
-                ToolbarChip(
-                    label = "🗑 Clear",
-                    onClick = { viewModel.clearAllLogs() },
-                    contentColor = Color(0xFFEF5350)
-                )
-                Text(
-                    text = "%,d baris".format(logs.size),
-                    color = DimColor,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // ===== DAFTAR LOG =====
-        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            if (logs.isEmpty()) {
-                val filtered = searchQuery.isNotEmpty() || minLevel != LogLevel.VERBOSE
-                Text(
-                    text = if (filtered) "Tidak ada log yang cocok dengan filter" else "Menunggu log…",
-                    color = DimColor,
-                    fontSize = 13.sp,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            }
-
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(logs, key = { it.id }) { log ->
-                    LogItemRow(logLine = log)
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .logScrollbar(listState)
+                ) {
+                    itemsIndexed(logs, key = { _, log -> log.id }) { index, log ->
+                        LogListEntry(
+                            logLine = log,
+                            showDivider = index > 0,
+                            compact = compactView,
+                            highlight = highlight,
+                            onLongClick = { selectedId = log.id }
+                        )
+                    }
                 }
-            }
 
-            if (!autoScrollLocked && logs.isNotEmpty()) {
-                ToolbarChip(
-                    label = "⬇ Ke bawah",
-                    onClick = { autoScrollLocked = true },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
-                    containerColor = Color(0xFF66BB6A),
-                    contentColor = Color.Black,
-                    bold = true
-                )
+                // FAB gulir atas/bawah (muncul saat auto-scroll dijeda)
+                AnimatedVisibility(
+                    visible = !autoScrollLocked && logs.isNotEmpty(),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(12.dp),
+                    enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
+                    exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it })
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        FloatingActionButton(
+                            onClick = { scope.launch { listState.scrollToItem(0) } },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Ke atas")
+                        }
+                        FloatingActionButton(
+                            onClick = { autoScrollLocked = true },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Ke bawah")
+                        }
+                    }
+                }
             }
         }
     }
-}
 
-@Composable
-private fun ToolbarChip(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    containerColor: Color = ChipColor,
-    contentColor: Color = MessageColor,
-    bold: Boolean = false
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(containerColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 7.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            color = contentColor,
-            fontSize = 12.sp,
-            fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium,
-            maxLines = 1
+    if (selected != null) {
+        LogActionsSheet(
+            logLine = selected,
+            onDismiss = { selectedId = null },
+            onFilterTag = { tag ->
+                viewModel.isRegexEnabled.value = false
+                viewModel.searchQuery.value = tag
+                selectedId = null
+            }
         )
     }
 }
 
-/**
- * Satu baris log ringkas: jam | level | tag: pesan.
- * Tap = tampilkan detail (tanggal, PID, TID). Tekan lama = salin baris.
- */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun LogItemRow(logLine: LogLine) {
-    val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
-    var expanded by rememberSaveable { mutableStateOf(false) }
-
-    val rowBackground = when (logLine.level) {
-        LogLevel.ERROR, LogLevel.FATAL -> Color(0x33EF5350)
-        LogLevel.WARN -> Color(0x22FFA726)
-        else -> Color.Transparent
+private fun LogTopBar(
+    count: Int,
+    filtered: Boolean,
+    scrollPaused: Boolean,
+    compactView: Boolean,
+    onSearch: () -> Unit,
+    onTogglePause: () -> Unit,
+    onToggleCompact: () -> Unit,
+    onClear: () -> Unit
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val subtitle = buildString {
+        append("%,d baris".format(count))
+        if (filtered) append(" · filter aktif")
+        if (scrollPaused) append(" · scroll dijeda")
     }
 
-    val styled = remember(logLine, expanded) {
-        buildAnnotatedString {
-            withStyle(SpanStyle(color = DimColor)) {
-                append(logLine.timestamp.substringAfterLast(' '))
-                append(' ')
+    TopAppBar(
+        title = {
+            Column {
+                Text(text = "LogLynx", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            withStyle(
-                SpanStyle(color = Color.Black, background = logLine.level.color, fontWeight = FontWeight.Bold)
-            ) {
-                append(" ${logLine.level.char} ")
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
+        actions = {
+            IconButton(onClick = onSearch) {
+                Icon(Icons.Default.Search, contentDescription = "Cari")
             }
-            withStyle(SpanStyle(color = logLine.level.color, fontWeight = FontWeight.Bold)) {
-                append(" ${logLine.tag}")
+            IconButton(onClick = onTogglePause) {
+                Icon(
+                    imageVector = if (scrollPaused) Icons.Default.PlayArrow else PauseIcon,
+                    contentDescription = if (scrollPaused) "Lanjutkan auto-scroll" else "Jeda auto-scroll"
+                )
             }
-            withStyle(SpanStyle(color = DimColor)) { append(": ") }
-            withStyle(SpanStyle(color = MessageColor)) { append(logLine.message) }
-            if (expanded) {
-                withStyle(SpanStyle(color = DimColor)) {
-                    append("\n${logLine.timestamp}  PID ${logLine.pid}  TID ${logLine.tid}")
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Opsi lainnya")
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(if (compactView) "Tampilan lengkap" else "Tampilan ringkas") },
+                        onClick = {
+                            menuOpen = false
+                            onToggleCompact()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Hapus log") },
+                        onClick = {
+                            menuOpen = false
+                            onClear()
+                        }
+                    )
                 }
             }
         }
+    )
+}
+
+/** Search bar menggantikan app bar (seperti LogcatReader): kembali, kolom cari, tombol Regex. */
+@Composable
+private fun SearchTopBar(
+    query: String,
+    isRegex: Boolean,
+    regexError: Boolean,
+    onQueryChange: (String) -> Unit,
+    onToggleRegex: () -> Unit,
+    onClose: () -> Unit
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(focusRequester) {
+        runCatching { focusRequester.requestFocus() }
     }
 
-    Text(
-        text = styled,
-        fontFamily = FontFamily.Monospace,
-        fontSize = 12.sp,
-        lineHeight = 17.sp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(rowBackground)
-            .combinedClickable(
-                onClick = { expanded = !expanded },
-                onLongClick = {
-                    clipboard.setText(
-                        AnnotatedString(
-                            "${logLine.timestamp} ${logLine.pid}-${logLine.tid} " +
-                                "${logLine.level.char}/${logLine.tag}: ${logLine.message}"
-                        )
-                    )
-                    Toast.makeText(context, "Baris log disalin", Toast.LENGTH_SHORT).show()
+    val content = MaterialTheme.colorScheme.onPrimaryContainer
+    val textColor = if (regexError) Color(0xFFFFB4AB) else content
+
+    TopAppBar(
+        navigationIcon = {
+            IconButton(onClick = onClose) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Tutup pencarian")
+            }
+        },
+        title = {
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = TextStyle(color = textColor, fontSize = 16.sp),
+                cursorBrush = SolidColor(content),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+                decorationBox = { innerTextField ->
+                    Box(contentAlignment = Alignment.CenterStart) {
+                        if (query.isEmpty()) {
+                            Text(
+                                text = "Cari tag / pesan…",
+                                color = content.copy(alpha = 0.7f),
+                                fontSize = 16.sp,
+                                maxLines = 1
+                            )
+                        }
+                        innerTextField()
+                    }
                 }
             )
-            .padding(horizontal = 8.dp, vertical = 3.dp)
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            titleContentColor = content,
+            navigationIconContentColor = content,
+            actionIconContentColor = content
+        ),
+        actions = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Default.Close, contentDescription = "Hapus teks")
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .padding(end = 8.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isRegex) content else Color.Transparent)
+                    .clickable(onClick = onToggleRegex)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Regex",
+                    color = if (isRegex) MaterialTheme.colorScheme.primaryContainer else content,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+            }
+        }
     )
+}
+
+/** Level minimum: satu baris chip yang bisa digulir horizontal (tidak terpotong di layar sempit). */
+@Composable
+private fun LevelFilterRow(minLevel: LogLevel, onSelect: (LogLevel) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Min",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        LogLevel.entries.forEach { level ->
+            FilterChip(
+                selected = minLevel == level,
+                onClick = { onSelect(level) },
+                label = {
+                    Text(
+                        text = level.char,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = level.badgeColor(),
+                    selectedLabelColor = Color.White
+                )
+            )
+        }
+    }
+}
+
+/** Bottom sheet tekan-lama (seperti LogcatReader): salin baris / salin pesan / filter tag ini. */
+@Composable
+private fun LogActionsSheet(
+    logLine: LogLine,
+    onDismiss: () -> Unit,
+    onFilterTag: (String) -> Unit
+) {
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(bottom = 16.dp)) {
+            Text(
+                text = "${logLine.level.char}/${logLine.tag}",
+                color = logLine.level.badgeColor(),
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+            Text(
+                text = logLine.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 12.dp)
+            )
+            HorizontalDivider()
+            SheetAction("Salin baris lengkap") {
+                clipboard.setText(
+                    AnnotatedString(
+                        "${logLine.timestamp} ${logLine.pid}-${logLine.tid} " +
+                            "${logLine.level.char}/${logLine.tag}: ${logLine.message}"
+                    )
+                )
+                Toast.makeText(context, "Baris log disalin", Toast.LENGTH_SHORT).show()
+                onDismiss()
+            }
+            SheetAction("Salin pesan") {
+                clipboard.setText(AnnotatedString(logLine.message))
+                Toast.makeText(context, "Pesan disalin", Toast.LENGTH_SHORT).show()
+                onDismiss()
+            }
+            SheetAction("Filter tag ini") { onFilterTag(logLine.tag) }
+        }
+    }
+}
+
+@Composable
+private fun SheetAction(label: String, onClick: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(label) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.clickable(onClick = onClick)
+    )
+}
+
+// Ikon Pause (material-icons-extended tidak dipakai agar APK tetap kecil)
+private val PauseIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).path(fill = SolidColor(Color.Black)) {
+        moveTo(6f, 19f)
+        horizontalLineToRelative(4f)
+        verticalLineTo(5f)
+        horizontalLineTo(6f)
+        verticalLineToRelative(14f)
+        close()
+        moveTo(14f, 5f)
+        verticalLineToRelative(14f)
+        horizontalLineToRelative(4f)
+        verticalLineTo(5f)
+        horizontalLineToRelative(-4f)
+        close()
+    }.build()
 }
