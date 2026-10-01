@@ -244,29 +244,14 @@ fun LogcatScreen(viewModel: LogcatViewModel = viewModel()) {
                 }
 
                 // FAB gulir atas/bawah (muncul saat auto-scroll dijeda)
-                AnimatedVisibility(
+                ScrollFabs(
                     visible = !autoScrollLocked && logs.isNotEmpty(),
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(12.dp),
-                    enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
-                    exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it })
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        FloatingActionButton(
-                            onClick = { scope.launch { listState.scrollToItem(0) } },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Ke atas")
-                        }
-                        FloatingActionButton(
-                            onClick = { autoScrollLocked = true },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Ke bawah")
-                        }
-                    }
-                }
+                    onScrollTop = { scope.launch { listState.scrollToItem(0) } },
+                    onScrollBottom = { autoScrollLocked = true }
+                )
             }
         }
     }
@@ -281,6 +266,38 @@ fun LogcatScreen(viewModel: LogcatViewModel = viewModel()) {
                 selectedId = null
             }
         )
+    }
+}
+
+// Top-level (bukan di dalam Column/Box): menghindari bentrok DslMarker antara
+// ColumnScope.AnimatedVisibility dan BoxScope pada pemanggilan implicit receiver.
+@Composable
+private fun ScrollFabs(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    onScrollTop: () -> Unit,
+    onScrollBottom: () -> Unit
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
+        exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it })
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            FloatingActionButton(
+                onClick = onScrollTop,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Ke atas")
+            }
+            FloatingActionButton(
+                onClick = onScrollBottom,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Ke bawah")
+            }
+        }
     }
 }
 

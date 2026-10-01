@@ -1,5 +1,9 @@
 # Changelog
 
+## v6 — 2026-10-01
+- Perbaikan build: tombol gulir atas/bawah (FAB) dipindah ke composable tersendiri sehingga kompilasi `MainActivity.kt` tidak lagi gagal (AnimatedVisibility di dalam Column/Box). Tampilan dan perilaku tidak berubah.
+- CI: jika build gagal, log diagnosis otomatis diunggah sebagai artefak bernama `LogLynx-failure-run<nomor>-a<attempt>-<fase>-<sha7>` (nomor naik otomatis, tidak pernah bentrok saat re-run), berisi ringkasan, daftar error, log Gradle penuh (secret disamarkan), dan info lingkungan. Error kompilasi juga muncul sebagai anotasi di halaman run.
+
 ## v5 — 2026-10-01
 - Tampilan baru terinspirasi LogcatReader: app bar teal berisi judul + jumlah baris, tombol Cari, Jeda/Lanjut auto-scroll, dan menu (tampilan ringkas, hapus log). Mengikuti tema terang/gelap sistem.
 - Baris log: badge prioritas berwarna di kiri, tag, pesan, lalu tanggal/jam/PID/TID. Mode ringkas satu baris (tap = buka detail). Tint merah/oranye untuk E/F/W tetap ada.

@@ -23,3 +23,21 @@ Verifikasi (opsional): `sha256sum LogLynx-v<versi>.apk` harus sama dengan nilai 
 ## Alur rilis
 
 Push ke `main` (selain perubahan `*.md`) memicu build. Jika GitHub Secrets signing ada, APK diverifikasi (`apksigner`), lalu dipublikasikan sebagai Release `v1.0.<nomor build>`. Tanpa Secrets, build tetap jalan tetapi tidak merilis APK unsigned. Catatan rilis diambil dari entri teratas `CHANGELOG.md`.
+
+## Log kegagalan CI
+
+Jika build gagal/dibatalkan, workflow mengunggah artefak diagnosis (disimpan 30 hari):
+
+`LogLynx-failure-run<NNNN>-a<attempt>-<fase>-<sha7>`
+
+- `NNNN` = nomor run (naik otomatis, dipad 4 digit agar urut), `a<attempt>` naik tiap re-run, `<fase>` = task Gradle yang gagal (mis. `compileReleaseKotlin`) atau `keystore` / `signing-verify` / `release-publish` / `setup`.
+- Isi: `diagnosis.md`, `errors.txt`, `gradle-build.log` (secret disamarkan), `environment.txt`, dan `reports/` / `r8/` / `kotlin-daemon/` bila ada.
+- Ringkasan error + tautan artefak juga tampil di tab Summary run; error kompilasi Kotlin muncul sebagai anotasi pada baris kode.
+
+Unduh run gagal terakhir dari Termux:
+
+```bash
+cd ~/projects/LogLynx && gh run download "$(gh run list --workflow build.yml --status failure --limit 1 --json databaseId --jq '.[0].databaseId')" --pattern 'LogLynx-failure-*' --dir ~/storage/downloads
+```
+
+Logika pengumpulan ada di `.github/scripts/collect-failure-logs.sh`.
