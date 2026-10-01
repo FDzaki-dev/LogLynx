@@ -20,6 +20,8 @@
 - Dependency tambahan agar compile: activity-compose 1.9.3, lifecycle-runtime-compose 2.8.7
 - Engine: Shizuku.newProcess via reflection (deprecated/private di 13.1.x); counter ukuran buffer (size deque O(n)); emit hanya jika ada data baru; proses logcat di-destroy saat cancel; buffer dibersihkan tiap start
 - ViewModel: regex dikompilasi sekali per emisi; filter di Dispatchers.Default; request izin Shizuku + restart stream saat izin/binder siap
-- UI: collectAsStateWithLifecycle, rememberSaveable, WindowInsets (systemBars + ime), auto-scroll keyed id baris terakhir + scrollToItem
+- UI (v2, MainActivity.kt): toolbar 3 baris tanpa tinggi fixed (bobot rata, tidak terpotong), warna konten eksplisit (kontras), BasicTextField kompak + tombol hapus,
+  chip level (terpilih = warna level), baris log 1 paragraf: jam | badge level | tag: pesan, tint merah/oranye untuk E/F/W, tap = detail (tanggal/PID/TID), tekan lama = salin,
+  auto-scroll berhenti saat user drag + tombol 'Ke bawah', penghitung baris, empty state; tetap: collectAsStateWithLifecycle, rememberSaveable, WindowInsets (systemBars + ime), auto-scroll keyed id baris terakhir + scrollToItem
 
-[RESUME POINT]: Initial setup LogLynx v1 -> ZIP tersusun sesuai konfigurasi lampiran, BELUM pernah di-build/di-run -> Jalankan Box A + Box B, cek build GitHub Actions pertama; jika gagal, perbaiki hanya file/baris yang disebut error compile (kandidat: LogcatEngine.newShizukuProcess/openProcess, LogcatViewModel binderListener & permissionListener)
+[RESUME POINT]: UI readability v2 (MainActivity.kt: toolbar terpotong, kontras 'Min Level' hitam di latar gelap, baris log 2 baris boros ruang) -> kode selesai, BELUM diverifikasi di perangkat (v1 sudah ter-build, jalan, Shizuku mengalirkan log sistem) -> Install APK v2 dari artifact Actions, cek: toolbar tidak terpotong, auto-scroll berhenti saat drag, tap = expand, tekan lama = salin; jika ada bug mulai dari LogcatScreen / LogItemRow / ToolbarChip di MainActivity.kt (jangan sentuh engine/viewmodel)
