@@ -13,3 +13,4 @@
 release.keystore
 *.keystore
 *.jks
+/.kotlin/

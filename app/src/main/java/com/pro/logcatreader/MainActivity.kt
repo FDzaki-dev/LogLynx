@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -23,8 +24,10 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -67,6 +71,19 @@ private val MessageColor = Color(0xFFE2E2E2)
 private val DimColor = Color(0xFF8A8A8A)
 
 class MainActivity : ComponentActivity() {
+    // Instance sama dengan viewModel() di LogcatScreen (owner = Activity)
+    private val logcatViewModel: LogcatViewModel by viewModels()
+
+    override fun onStart() {
+        super.onStart()
+        logcatViewModel.onUiStart()
+    }
+
+    override fun onStop() {
+        logcatViewModel.onUiStop()
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
@@ -118,10 +135,21 @@ fun LogcatScreen(viewModel: LogcatViewModel = viewModel()) {
             .imePadding()
     ) {
         // ===== TOOLBAR (tiap baris muat di layar sempit: bobot rata, tanpa tinggi fixed) =====
+        // Tinggi dibatasi maks 50% area tersedia + scrollable: tidak terpotong di landscape/keyboard terbuka
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .layout { measurable, constraints ->
+                    val limited = if (constraints.hasBoundedHeight) {
+                        constraints.copy(maxHeight = maxOf(constraints.minHeight, constraints.maxHeight / 2))
+                    } else {
+                        constraints
+                    }
+                    val placeable = measurable.measure(limited)
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                }
                 .background(ToolbarColor)
+                .verticalScroll(rememberScrollState())
                 .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {

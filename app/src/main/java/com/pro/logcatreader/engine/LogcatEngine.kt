@@ -11,6 +11,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import rikka.shizuku.Shizuku
@@ -35,6 +37,12 @@ object LogcatEngine {
     private val bufferSize = AtomicInteger(0)
     // Emit ke UI hanya jika ada data baru
     private val dirty = AtomicBoolean(false)
+    // UI terlihat (Activity STARTED)? Saat false, sinkron ke UI ditangguhkan total (tanpa wake-up & salinan buffer)
+    private val uiActive = MutableStateFlow(false)
+
+    fun setUiActive(active: Boolean) {
+        uiActive.value = active
+    }
 
     fun startStreaming(scope: CoroutineScope) {
         val previous = logJob
@@ -59,13 +67,15 @@ object LogcatEngine {
                 }
             }
 
-            // Buffer UI secara berkala (200ms) agar aplikasi tidak lag
+            // Buffer UI secara berkala (200ms) agar aplikasi tidak lag.
+            // Saat UI di background loop suspend (0 wake-up); begitu UI aktif, data tertunda langsung di-emit.
             val uiSyncJob = launch {
                 while (isActive) {
-                    delay(200)
+                    uiActive.first { it }
                     if (dirty.getAndSet(false)) {
                         logFlow.emit(internalBuffer.toList())
                     }
+                    delay(200)
                 }
             }
 

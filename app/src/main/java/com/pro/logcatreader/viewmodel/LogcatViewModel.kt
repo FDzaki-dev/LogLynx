@@ -84,6 +84,11 @@ class LogcatViewModel : ViewModel() {
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Sinkron log ke UI hanya saat Activity STARTED (dipanggil dari MainActivity.onStart/onStop)
+    fun onUiStart() = LogcatEngine.setUiActive(true)
+
+    fun onUiStop() = LogcatEngine.setUiActive(false)
+
     fun clearAllLogs() {
         LogcatEngine.clearBuffer()
         _rawLogs.value = emptyList()

@@ -1,5 +1,10 @@
 # Changelog
 
+## v4 — 2026-10-01
+- Hemat baterai: sinkronisasi log ke layar berhenti total saat aplikasi di background (tanpa wake-up 200 ms dan salinan buffer 50.000 baris); otomatis lanjut saat aplikasi dibuka lagi.
+- UI: toolbar kini bisa digulir dan tingginya dibatasi maksimal setengah area tersedia, sehingga tidak terpotong di landscape/keyboard terbuka dan daftar log tetap terlihat.
+- Crash rilis: nama file & nomor baris dipertahankan di R8, sehingga stack trace di Documents/LogLynx bisa di-retrace dengan mapping.txt.
+
 ## v3 — 2026-10-01
 - Distribusi: APK ter-sign kini dirilis otomatis lewat GitHub Releases (tag v1.0.<nomor build>) lengkap dengan file SHA-256. Versi naik tiap build sehingga APK baru selalu bisa meng-update yang lama.
 
