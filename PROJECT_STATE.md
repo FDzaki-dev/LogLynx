@@ -8,12 +8,20 @@
 - Package/namespace: com.pro.logcatreader (sesuai lampiran). Label: LogLynx
 - minSdk 26, compile/target 35, Kotlin 2.0.21, AGP 8.7.3, Gradle 8.9 (CI via setup-gradle, tanpa wrapper)
 - Release: R8 + shrinkResources ON; signing dari env KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD + release.keystore (GitHub Secrets, Box B)
+- Versi: versionCode = GITHUB_RUN_NUMBER, versionName = 1.0.<run> di CI (lokal: 1 / 1.0.0-dev); basis "1.0" = appVersionBase di app/build.gradle.kts
 
 ## Struktur
 - model/LogModel.kt (LogLevel, LogLine, LogcatParser)
 - engine/LogcatEngine.kt (stream logcat -v threadtime, circular buffer 50000, sync UI 200ms)
 - viewmodel/LogcatViewModel.kt (filter level + teks/regex, listener Shizuku)
 - MainActivity.kt (UI Compose Darcula), LogLynxApp.kt + CrashLogger.kt (crash -> Documents/LogLynx via MediaStore)
+
+## CI / Release (build.yml)
+- Trigger: push ke main (paths-ignore *.md, .gitignore) + workflow_dispatch; permissions contents: write; concurrency tanpa cancel
+- Alur: keystore dari Secrets -> gradle assembleRelease -> apksigner verify -> baca versionName via aapt2 -> aset LogLynx-v<versi>.apk + .sha256 -> gh release create v<versi> (notes = entri teratas CHANGELOG + SHA-256)
+- Tanpa Secrets: build tetap jalan, rilis dilewati (APK unsigned tidak bisa di-install). Re-run run yang sama: aset ditimpa, bukan release ganda
+- Artifact tambahan: LogLynx-release (APK, 14 hari), LogLynx-mapping (mapping R8, 30 hari)
+- Unduh di HP: tab Releases, atau Termux: gh release download --pattern 'LogLynx-*.apk' (lihat README)
 
 ## Deviasi dari lampiran (disengaja)
 - Manifest: tanpa atribut package (pakai namespace Gradle); ShizukuProvider exported=true + permission INTERACT_ACROSS_USERS_FULL (wajib agar binder Shizuku masuk)
@@ -24,4 +32,4 @@
   chip level (terpilih = warna level), baris log 1 paragraf: jam | badge level | tag: pesan, tint merah/oranye untuk E/F/W, tap = detail (tanggal/PID/TID), tekan lama = salin,
   auto-scroll berhenti saat user drag + tombol 'Ke bawah', penghitung baris, empty state; tetap: collectAsStateWithLifecycle, rememberSaveable, WindowInsets (systemBars + ime), auto-scroll keyed id baris terakhir + scrollToItem
 
-[RESUME POINT]: UI readability v2 (MainActivity.kt: toolbar terpotong, kontras 'Min Level' hitam di latar gelap, baris log 2 baris boros ruang) -> kode selesai, BELUM diverifikasi di perangkat (v1 sudah ter-build, jalan, Shizuku mengalirkan log sistem) -> Install APK v2 dari artifact Actions, cek: toolbar tidak terpotong, auto-scroll berhenti saat drag, tap = expand, tekan lama = salin; jika ada bug mulai dari LogcatScreen / LogItemRow / ToolbarChip di MainActivity.kt (jangan sentuh engine/viewmodel)
+[RESUME POINT]: Jalur unduhan GitHub Release (build.yml + versi dinamis di app/build.gradle.kts) -> kode selesai, BELUM dijalankan di GitHub; UI v2 (MainActivity.kt) juga belum diverifikasi di perangkat -> Push via Daily Update, cek tab Actions lalu Releases: tag v1.0.<run>, aset LogLynx-v*.apk + .sha256, notes terisi; install APK dari Releases dan cek UI v2. Jika job gagal mulai dari step 'Verifikasi tanda tangan & siapkan aset rilis' (path apksigner/aapt2 di $ANDROID_HOME/build-tools) atau 'Publikasi GitHub Release' (izin contents: write / setelan Actions permissions repo)

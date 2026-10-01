@@ -12,6 +12,11 @@ val releaseKeyPassword: String? = System.getenv("KEY_PASSWORD")?.takeIf { it.isN
 val canSignRelease = releaseKeystore.exists() &&
     releaseStorePassword != null && releaseKeyAlias != null && releaseKeyPassword != null
 
+// Versi: di CI mengikuti nomor run GitHub Actions (monoton naik -> APK baru selalu bisa meng-update yang lama).
+// Rilis GitHub memakai versionName ini sebagai tag (v<versionName>).
+val ciRunNumber: Int? = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val appVersionBase = "1.0"
+
 android {
     namespace = "com.pro.logcatreader"
     compileSdk = 35
@@ -20,8 +25,8 @@ android {
         applicationId = "com.pro.logcatreader"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = ciRunNumber ?: 1
+        versionName = if (ciRunNumber != null) "$appVersionBase.$ciRunNumber" else "$appVersionBase.0-dev"
     }
 
     signingConfigs {

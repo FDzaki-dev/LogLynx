@@ -1,13 +1,25 @@
-name: Build LogLynx
+name: Build & Release LogLynx
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
   workflow_dispatch:
 
+# contents: write dibutuhkan untuk membuat tag + GitHub Release
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  build:
+  build-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -20,22 +32,100 @@ jobs:
         with:
           gradle-version: 8.9
 
-      - name: Decode keystore
+      - name: Siapkan keystore
+        id: keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::GitHub Secrets signing belum ada (jalankan Box B). APK unsigned tidak akan dirilis."
           fi
 
-      - name: Build release APK
+      - name: Build release APK (R8 + shrinkResources)
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: gradle assembleRelease --stacktrace
 
+      - name: Verifikasi tanda tangan & siapkan aset rilis
+        id: assets
+        if: steps.keystore.outputs.signed == 'true'
+        run: |
+          set -euo pipefail
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)"
+          APK_SRC="$(ls app/build/outputs/apk/release/*.apk | head -n 1)"
+
+          # Gagalkan job jika APK tidak ter-sign dengan benar (APK unsigned tidak bisa di-install)
+          "${BT}apksigner" verify --verbose "$APK_SRC"
+
+          # Versi dibaca dari APK hasil build (satu sumber kebenaran: Gradle)
+          VERSION="$("${BT}aapt2" dump badging "$APK_SRC" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -n 1)"
+          if [ -z "$VERSION" ]; then
+            echo "::error::versionName tidak terbaca dari APK"
+            exit 1
+          fi
+
+          OUT="LogLynx-v${VERSION}.apk"
+          cp "$APK_SRC" "$OUT"
+          sha256sum "$OUT" > "$OUT.sha256"
+          HASH="$(cut -d' ' -f1 "$OUT.sha256")"
+
+          # Catatan rilis = entri teratas CHANGELOG.md (urutan descending) + panduan install
+          {
+            awk '/^## /{n++; next} n==1' CHANGELOG.md
+            echo
+            echo "---"
+            echo "**Install:** unduh \`$OUT\` lalu buka di Android 8.0+ (izinkan install dari sumber ini jika diminta)."
+            echo
+            echo "**Log sistem penuh:** jalankan Shizuku lalu beri izin ke LogLynx."
+            echo
+            echo "**SHA-256:** \`$HASH\`"
+          } > release_notes.md
+
+          {
+            echo "version=$VERSION"
+            echo "apk=$OUT"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publikasi GitHub Release
+        if: steps.keystore.outputs.signed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.assets.outputs.version }}
+          APK: ${{ steps.assets.outputs.apk }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Re-run job yang sama: timpa aset, jangan buat release ganda
+            gh release upload "$TAG" "$APK" "$APK.sha256" --clobber
+          else
+            gh release create "$TAG" "$APK" "$APK.sha256" \
+              --target "$GITHUB_SHA" \
+              --title "LogLynx v${VERSION}" \
+              --notes-file release_notes.md \
+              --latest
+          fi
+
+      - name: Hapus keystore dari runner
+        if: always()
+        run: rm -f release.keystore
+
       - uses: actions/upload-artifact@v4
         with:
           name: LogLynx-release
           path: app/build/outputs/apk/release/*.apk
+          retention-days: 14
+
+      # Mapping R8 untuk membaca stack trace crash rilis
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LogLynx-mapping
+          path: app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
+          retention-days: 30
