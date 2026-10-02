@@ -100,6 +100,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pro.logcatreader.model.LogLevel
 import com.pro.logcatreader.model.LogLine
+import com.pro.logcatreader.ui.DisplayPrefs
+import com.pro.logcatreader.ui.DisplaySettings
 import com.pro.logcatreader.ui.LogDisplayOptions
 import com.pro.logcatreader.ui.LogListEntry
 import com.pro.logcatreader.ui.logScrollbar
@@ -107,7 +109,9 @@ import com.pro.logcatreader.ui.theme.LogLynxTheme
 import com.pro.logcatreader.ui.theme.RobotoMonoFontFamily
 import com.pro.logcatreader.ui.theme.badgeColor
 import com.pro.logcatreader.viewmodel.LogcatViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     // Instance sama dengan viewModel() di LogcatScreen (owner = Activity)
@@ -174,6 +178,30 @@ fun LogcatScreen(viewModel: LogcatViewModel = viewModel()) {
     val regexError = isRegex && searchQuery.isNotEmpty() && highlight == null
     val displayOptions = remember(showTag, showDate, showTime, showPid, showTid) {
         LogDisplayOptions(showTag, showDate, showTime, showPid, showTid)
+    }
+
+    // Opsi tampilan bertahan antar sesi: muat sekali (IO), tulis tiap berubah. Tulis menunggu muat selesai
+    // agar nilai default tidak menimpa pilihan tersimpan.
+    val appContext = LocalContext.current.applicationContext
+    var displayLoaded by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!displayLoaded) {
+            val saved = withContext(Dispatchers.IO) { DisplayPrefs.read(appContext) }
+            compactView = saved.compact
+            showTag = saved.options.showTag
+            showDate = saved.options.showDate
+            showTime = saved.options.showTime
+            showPid = saved.options.showPid
+            showTid = saved.options.showTid
+            displayLoaded = true
+        }
+    }
+    LaunchedEffect(displayLoaded, compactView, displayOptions) {
+        if (displayLoaded) {
+            withContext(Dispatchers.IO) {
+                DisplayPrefs.write(appContext, DisplaySettings(compactView, displayOptions))
+            }
+        }
     }
     val filtered = searchQuery.isNotEmpty() || minLevel != LogLevel.VERBOSE
     val selected: LogLine? = selectedId?.let { id -> logs.lastOrNull { it.id == id } }

@@ -1,5 +1,8 @@
 # Changelog
 
+## v8 — 2026-10-02
+- Opsi tampilan (kolom Tag/Tanggal/Jam/PID/TID dan Tampilan ringkas) kini tersimpan: tidak perlu diatur ulang setiap aplikasi dibuka.
+
 ## v7 — 2026-10-02
 - Tampilan makin dekat LogcatReader: font Roboto Mono (Regular/Medium/Bold) di baris log, chip level, dan menu aksi; ukuran teks/padding baris dan badge disamakan.
 - Menu > Opsi tampilan (bottom sheet): pilih kolom Tag / Tanggal / Jam / PID / TID dan saklar Tampilan ringkas. Berlaku langsung. Di mode ringkas hanya Tag yang bisa diatur; baris ringkas yang dibuka menampilkan semua kolom dengan animasi buka-tutup.
