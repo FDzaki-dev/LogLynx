@@ -1,5 +1,12 @@
 # Changelog
 
+## v7 — 2026-10-02
+- Tampilan makin dekat LogcatReader: font Roboto Mono (Regular/Medium/Bold) di baris log, chip level, dan menu aksi; ukuran teks/padding baris dan badge disamakan.
+- Menu > Opsi tampilan (bottom sheet): pilih kolom Tag / Tanggal / Jam / PID / TID dan saklar Tampilan ringkas. Berlaku langsung. Di mode ringkas hanya Tag yang bisa diatur; baris ringkas yang dibuka menampilkan semua kolom dengan animasi buka-tutup.
+- Pencarian: tombol Regex jadi ".*", jumlah baris cocok tampil di search bar, teks cari lebih besar.
+- App bar: ikon filter di depan jumlah baris saat filter aktif. Status kosong: indikator memuat + pesan di tengah. Bottom sheet memakai warna surface container.
+- Catatan: pengaturan Opsi tampilan bertahan saat rotasi, belum tersimpan setelah aplikasi ditutup. APK bertambah sekitar 340 KB (font).
+
 ## v6 — 2026-10-01
 - Perbaikan build: tombol gulir atas/bawah (FAB) dipindah ke composable tersendiri sehingga kompilasi `MainActivity.kt` tidak lagi gagal (AnimatedVisibility di dalam Column/Box). Tampilan dan perilaku tidak berubah.
 - CI: jika build gagal, log diagnosis otomatis diunggah sebagai artefak bernama `LogLynx-failure-run<nomor>-a<attempt>-<fase>-<sha7>` (nomor naik otomatis, tidak pernah bentrok saat re-run), berisi ringkasan, daftar error, log Gradle penuh (secret disamarkan), dan info lingkungan. Error kompilasi juga muncul sebagai anotasi di halaman run.

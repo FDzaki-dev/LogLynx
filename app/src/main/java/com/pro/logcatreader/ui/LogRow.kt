@@ -1,6 +1,9 @@
 package com.pro.logcatreader.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -20,6 +23,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,7 +42,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pro.logcatreader.model.LogLevel
 import com.pro.logcatreader.model.LogLine
+import com.pro.logcatreader.ui.theme.RobotoMonoFontFamily
 import com.pro.logcatreader.ui.theme.badgeColor
 import com.pro.logcatreader.ui.theme.logSecondaryColor
 import com.pro.logcatreader.ui.theme.searchHitColor
@@ -55,6 +59,46 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 
 private const val MAX_HIGHLIGHTS_PER_FIELD = 20
 
+/** Kolom yang tampil di baris log (Opsi tampilan). Semua aktif = tampilan LogcatReader penuh. */
+@Immutable
+data class LogDisplayOptions(
+    val showTag: Boolean = true,
+    val showDate: Boolean = true,
+    val showTime: Boolean = true,
+    val showPid: Boolean = true,
+    val showTid: Boolean = true
+)
+
+private val AllColumns = LogDisplayOptions()
+
+// Gaya teks baris log (Roboto Mono, ukuran identik LogcatReader)
+private val BadgeStyle = TextStyle(
+    fontFamily = RobotoMonoFontFamily,
+    fontSize = 12.sp,
+    fontWeight = FontWeight.Bold,
+    color = Color.White,
+    textAlign = TextAlign.Center
+)
+private val TagStyle = TextStyle(
+    fontFamily = RobotoMonoFontFamily,
+    fontSize = 13.sp,
+    fontWeight = FontWeight.Medium
+)
+private val CompactTagStyle = TextStyle(
+    fontFamily = RobotoMonoFontFamily,
+    fontSize = 12.sp,
+    fontWeight = FontWeight.Medium
+)
+private val MessageStyle = TextStyle(
+    fontFamily = RobotoMonoFontFamily,
+    fontSize = 12.sp
+)
+private val MetaStyle = TextStyle(
+    fontFamily = RobotoMonoFontFamily,
+    fontSize = 12.sp,
+    fontWeight = FontWeight.Bold
+)
+
 /**
  * Satu entri daftar: pemisah tipis + baris log.
  */
@@ -63,6 +107,7 @@ fun LogListEntry(
     logLine: LogLine,
     showDivider: Boolean,
     compact: Boolean,
+    options: LogDisplayOptions,
     highlight: Regex?,
     onLongClick: () -> Unit
 ) {
@@ -71,6 +116,7 @@ fun LogListEntry(
         LogItemRow(
             logLine = logLine,
             compact = compact,
+            options = options,
             highlight = highlight,
             onLongClick = onLongClick
         )
@@ -78,23 +124,28 @@ fun LogListEntry(
 }
 
 /**
- * Baris log gaya LogcatReader: strip badge prioritas di kiri, lalu tag / pesan / tanggal-jam-PID-TID.
- * Mode ringkas: satu baris (tag 20% | pesan 80%), tap = buka detail. Tekan lama = menu aksi.
- * Tint tipis untuk W/E/F dipertahankan dari LogLynx.
+ * Baris log gaya LogcatReader: strip badge prioritas di kiri, lalu tag / pesan / tanggal-jam-PID-TID
+ * (Roboto Mono; kolom mengikuti Opsi tampilan).
+ * Mode ringkas: satu baris (tag 20% | pesan 80%), tap = buka (animasi) menampilkan semua kolom.
+ * Tekan lama = menu aksi. Tint tipis untuk W/E/F dipertahankan dari LogLynx.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LogItemRow(
     logLine: LogLine,
     compact: Boolean,
+    options: LogDisplayOptions,
     highlight: Regex?,
     onLongClick: () -> Unit
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val showFull = !compact || expanded
+    // Ringkas + dibuka = semua kolom tampil (seperti LogcatReader); non-ringkas mengikuti Opsi tampilan
+    val shown = if (compact) AllColumns else options
     val hitColor = searchHitColor()
     val secondary = logSecondaryColor()
     val priorityColor = logLine.level.badgeColor()
+    val metaStyle = remember(secondary) { MetaStyle.copy(color = secondary) }
 
     val tagText = remember(logLine.id, highlight, hitColor) {
         highlighted(logLine.tag, highlight, hitColor)
@@ -112,6 +163,7 @@ fun LogItemRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMedium))
             .height(IntrinsicSize.Max)
             .background(tint)
             .combinedClickable(
@@ -124,19 +176,10 @@ fun LogItemRow(
             modifier = Modifier
                 .fillMaxHeight()
                 .background(priorityColor)
-                .padding(horizontal = 6.dp, vertical = 4.dp),
+                .padding(if (showFull) 5.dp else 4.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = logLine.level.char,
-                style = TextStyle(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    textAlign = TextAlign.Center
-                )
-            )
+            Text(text = logLine.level.char, style = BadgeStyle)
         }
 
         if (showFull) {
@@ -146,61 +189,58 @@ fun LogItemRow(
                     .padding(5.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Text(
-                    text = tagText,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = TextStyle(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
+                if (shown.showTag) {
+                    Text(
+                        text = tagText,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = TagStyle
                     )
-                )
+                }
                 Text(
                     text = messageText,
                     modifier = Modifier.fillMaxWidth(),
-                    style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    style = MessageStyle
                 )
-                val meta = TextStyle(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = secondary
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(text = logLine.timestamp.substringBefore(' '), style = meta)
-                    Text(text = logLine.timestamp.substringAfter(' '), style = meta)
-                    Text(text = "PID ${logLine.pid}", style = meta)
-                    Text(text = "TID ${logLine.tid}", style = meta)
+                if (shown.showDate || shown.showTime || shown.showPid || shown.showTid) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (shown.showDate) {
+                            Text(text = logLine.timestamp.substringBefore(' '), style = metaStyle)
+                        }
+                        if (shown.showTime) {
+                            Text(text = logLine.timestamp.substringAfter(' '), style = metaStyle)
+                        }
+                        if (shown.showPid) Text(text = logLine.pid, style = metaStyle)
+                        if (shown.showTid) Text(text = logLine.tid, style = metaStyle)
+                    }
                 }
             }
         } else {
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 6.dp, vertical = 5.dp),
+                    .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = tagText,
-                    modifier = Modifier.weight(0.2f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = TextStyle(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                Spacer(modifier = Modifier.width(4.dp))
+                if (options.showTag) {
+                    Text(
+                        text = tagText,
+                        modifier = Modifier.weight(0.2f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = CompactTagStyle
                     )
-                )
-                Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
                 Text(
                     text = messageText,
-                    modifier = Modifier.weight(0.8f),
+                    modifier = Modifier.weight(if (options.showTag) 0.8f else 1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    style = MessageStyle
                 )
             }
         }

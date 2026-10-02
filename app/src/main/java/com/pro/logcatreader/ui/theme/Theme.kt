@@ -8,7 +8,11 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.pro.logcatreader.R
 import com.pro.logcatreader.model.LogLevel
 
 // Palet teal + bentuk 4/8/12 dp meniru LogcatReader; mode gelap memakai netral Darcula khas LogLynx.
@@ -66,6 +70,13 @@ private val DarkScheme = darkColorScheme(
     surfaceContainer = Color(0xFF2B2B2B),
     surfaceContainerHigh = Color(0xFF333333),
     surfaceContainerHighest = Color(0xFF3C3C3C)
+)
+
+/** Font log: Roboto Mono (sama dengan LogcatReader), 3 bobot yang dipakai UI: Regular/Medium/Bold. */
+val RobotoMonoFontFamily = FontFamily(
+    Font(R.font.roboto_mono_regular),
+    Font(R.font.roboto_mono_medium, FontWeight.Medium),
+    Font(R.font.roboto_mono_bold, FontWeight.Bold)
 )
 
 private val LogLynxShapes = Shapes(
