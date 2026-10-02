@@ -1,5 +1,9 @@
 # Changelog
 
+## v9 — 2026-10-02
+- Perbaikan: setelah daftar log digeser (scroll dijeda), tampilan kini otomatis mengikuti log lagi begitu daftar kembali ke dasar. Sebelumnya hanya bisa pulih lewat tombol Lanjut / tombol panah bawah.
+- Tombol Jeda di app bar tetap menahan scroll sampai ditekan Lanjut (atau tombol panah bawah), tidak ikut lanjut otomatis.
+
 ## v8 — 2026-10-02
 - Opsi tampilan (kolom Tag/Tanggal/Jam/PID/TID dan Tampilan ringkas) kini tersimpan: tidak perlu diatur ulang setiap aplikasi dibuka.
 

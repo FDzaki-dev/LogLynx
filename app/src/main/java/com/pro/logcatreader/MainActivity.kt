@@ -77,6 +77,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -110,6 +111,7 @@ import com.pro.logcatreader.ui.theme.RobotoMonoFontFamily
 import com.pro.logcatreader.ui.theme.badgeColor
 import com.pro.logcatreader.viewmodel.LogcatViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -155,6 +157,8 @@ fun LogcatScreen(viewModel: LogcatViewModel = viewModel()) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var autoScrollLocked by rememberSaveable { mutableStateOf(true) }
+    // Jeda lewat tombol app bar: tidak ikut lanjut otomatis saat daftar ada di dasar
+    var manualPause by rememberSaveable { mutableStateOf(false) }
     var searchActive by rememberSaveable { mutableStateOf(false) }
     var compactView by rememberSaveable { mutableStateOf(false) }
     var showDisplaySheet by rememberSaveable { mutableStateOf(false) }
@@ -213,6 +217,15 @@ fun LogcatScreen(viewModel: LogcatViewModel = viewModel()) {
         }
     }
 
+    // Auto-resume: setelah user selesai menggeser dan daftar berada di dasar, ikuti log lagi tanpa tombol.
+    // Jeda manual (tombol app bar) tidak diutak-atik; hanya Lanjut / FAB bawah yang memulihkannya.
+    LaunchedEffect(listState, manualPause) {
+        if (manualPause) return@LaunchedEffect
+        snapshotFlow { !listState.isScrollInProgress && !listState.canScrollForward }
+            .distinctUntilChanged()
+            .collect { atBottomAtRest -> if (atBottomAtRest) autoScrollLocked = true }
+    }
+
     // Key = id baris terakhir (bukan size) agar tetap scroll saat buffer penuh (size konstan)
     LaunchedEffect(logs.lastOrNull()?.id, autoScrollLocked) {
         if (autoScrollLocked && logs.isNotEmpty()) {
@@ -246,7 +259,15 @@ fun LogcatScreen(viewModel: LogcatViewModel = viewModel()) {
                     filtered = filtered,
                     scrollPaused = !autoScrollLocked,
                     onSearch = { searchActive = true },
-                    onTogglePause = { autoScrollLocked = !autoScrollLocked },
+                    onTogglePause = {
+                        if (autoScrollLocked) {
+                            manualPause = true
+                            autoScrollLocked = false
+                        } else {
+                            manualPause = false
+                            autoScrollLocked = true
+                        }
+                    },
                     onDisplayOptions = { showDisplaySheet = true },
                     onClear = { viewModel.clearAllLogs() }
                 )
@@ -299,7 +320,10 @@ fun LogcatScreen(viewModel: LogcatViewModel = viewModel()) {
                         .align(Alignment.BottomEnd)
                         .padding(12.dp),
                     onScrollTop = { scope.launch { listState.scrollToItem(0) } },
-                    onScrollBottom = { autoScrollLocked = true }
+                    onScrollBottom = {
+                        manualPause = false
+                        autoScrollLocked = true
+                    }
                 )
             }
         }
